@@ -49,18 +49,10 @@ contract FrenRenderer {
     error Missing();
     error BadArt();
 
-    /// @dev Static arguments only (IMD's launch): the seven FrenArtChunk contracts, in order. Each must hold exactly the
-    ///      art FrenArtIndex was generated from (its code hash), so this can only ever draw this art.
+    /// @dev Static arguments only (IMD's launch): the seven FrenArtChunk contracts, in order. Nothing is read here, so it
+    ///      deploys anywhere (IMD's admission deploys a launch on a fresh chain, where the earlier launches' chunks don't
+    ///      exist); every read checks its chunk's code hash instead (_entry), so this can only ever draw this art.
     constructor(address c1, address c2, address c3, address c4, address c5, address c6, address c7) {
-        address[7] memory cs = [c1, c2, c3, c4, c5, c6, c7];
-        bytes memory hashes = FrenArtIndex.CHUNK_HASHES;
-        for (uint256 k; k < 7; ++k) {
-            bytes32 want;
-            assembly ("memory-safe") {
-                want := mload(add(add(hashes, 32), mul(k, 32)))
-            }
-            if (cs[k].codehash != want) revert BadArt();
-        }
         (chunk1, chunk2, chunk3, chunk4, chunk5, chunk6, chunk7) = (c1, c2, c3, c4, c5, c6, c7);
     }
 
@@ -332,6 +324,12 @@ contract FrenRenderer {
             len := and(shr(216, w), 0xffff) // bytes 3-4
         }
         address p = [chunk1, chunk2, chunk3, chunk4, chunk5, chunk6, chunk7][c];
+        bytes memory hashes = FrenArtIndex.CHUNK_HASHES;
+        bytes32 want;
+        assembly ("memory-safe") {
+            want := mload(add(add(hashes, 32), mul(c, 32)))
+        }
+        if (p.codehash != want) revert BadArt(); // exactly the art FrenArtIndex was generated from, or nothing
         data = new bytes(len);
         if ((FrenArtIndex.FRAMED >> c) & 1 == 0) {
             if (p.code.length < 1 + off + len) revert Missing();

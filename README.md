@@ -9,8 +9,8 @@ IMD swarm can deploy them with IMD's `evm_contracts` launch: constructors only, 
 - `src/FrenArtIndex.sol`: where every layer sits (chunk, offset, length), the colour tables, the face table, each
   chunk's code hash, and which chunks are framed.
 - `src/FrenRenderer.sol`: draws a fren from its combo and seed: an 84x84 8-bit bitmap inside an SVG, with its traits,
-  as `tokenURI(tokenId, combo, seed)` and `pendingURI(tokenId)`. Its constructor takes the seven chunks and checks each
-  one's code hash, so it can only ever draw this art. No owner, nothing to configure, nothing that changes.
+  as `tokenURI(tokenId, combo, seed)` and `pendingURI(tokenId)`. Its constructor takes the seven chunks and every read checks
+  their code hashes, so it can only ever draw this art. No owner, nothing to configure, nothing that changes.
 
 IMD's launch admission reads every contract's code as instructions and refuses CALLCODE, DELEGATECALL and SELFDESTRUCT
 bytes, even in code that can never run. Where a chunk's art happens to show one (chunks 4 and 7), the chunk is stored
@@ -46,7 +46,8 @@ Each one's code hash is the one FrenArtIndex names; `test/OnChainChunks.fork.t.s
   renderer the frens launch with (`test/ref/FrenRendererRef.sol`);
 - `test_LaunchesFitTransactions`: each of the three launches below fits one transaction under EIP-7825's cap
   (2^24 gas): about 10.7M, 10.0M and 13.9M gas with calldata;
-- `test_TakesOnlyThisArt`: the renderer refuses other chunks, or these in another order;
+- `test_DrawsOnlyThisArt`: with other chunks, or these in another order, every read reverts;
+- `test_DeploysWithoutTheEarlierChunks`: the renderer deploys on a fresh chain (IMD's admission), where launches 1 and 2's chunks don't exist;
 - `test_ChunksPassTheAdmissionScan`: no chunk shows a refused opcode;
 - `test/OnChainChunks.fork.t.sol` (MAINNET_RPC_URL): the chunks already deployed (launch #819) draw the reference.
 
@@ -62,5 +63,6 @@ contracts has an owner; `owner` in the request is still the team wallet,
    the chunks from launches 1 and 2 (static addresses), then `$contract:FrenArtChunk5`, `$contract:FrenArtChunk6`,
    `$contract:FrenArtChunk7`.
 
-The renderer's constructor reverts unless every chunk is exactly this repository's, so a launch that changed the art
-can't produce a working renderer.
+Every read checks that its chunk is exactly this repository's, so a launch that changed the art can't produce a working
+renderer. (Launch #854 was parked when the renderer still checked in its constructor: IMD's admission deploys a launch
+on a fresh chain, where the earlier launches' chunks don't exist.)

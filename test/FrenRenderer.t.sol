@@ -150,13 +150,28 @@ contract FrenRendererTest is Test {
         }
     }
 
-    /// @dev The renderer takes only these chunks, in this order
-    function test_TakesOnlyThisArt() public {
+    /// @dev The renderer draws only these chunks, in this order: anything else and every read reverts
+    function test_DrawsOnlyThisArt() public {
+        FrenRenderer swapped = new FrenRenderer(chunks[1], chunks[0], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6]);
         vm.expectRevert(FrenRenderer.BadArt.selector);
-        new FrenRenderer(chunks[1], chunks[0], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6]);
+        swapped.tokenURI(1, 0, 0);
+        FrenRenderer stranger = new FrenRenderer(chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], address(0xBEEF));
         vm.expectRevert(FrenRenderer.BadArt.selector);
-        new FrenRenderer(chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], address(0xBEEF));
+        stranger.pendingURI(1);
         assertEq(r.chunk7(), chunks[6]);
+    }
+
+    /// @dev IMD's admission deploys launch 3 on a fresh chain, where launches 1 and 2's chunks don't exist: the
+    ///      renderer must still deploy there (it reads nothing until asked to draw)
+    function test_DeploysWithoutTheEarlierChunks() public {
+        address c5 = address(new FrenArtChunk5());
+        address c6 = address(new FrenArtChunk6());
+        address c7 = address(new FrenArtChunk7());
+        FrenRenderer alone = new FrenRenderer(
+            0xa92dAcfF6d6fcC218ADe20eD24857376BD8eBE81, 0x9666A481e20F1dB59EEbD6c43D11Ae3505468c92,
+            0x71BdEB749b3ee428730eBB3E9b34B03A99D82356, 0x0C344484D960B8474a1EdcB5A5128e8D9C9F6B4d, c5, c6, c7
+        );
+        assertEq(alone.chunk5(), c5);
     }
 
     /// @dev IMD's launch admission reads code as instructions (PUSH data skipped) and refuses CALLCODE, DELEGATECALL
