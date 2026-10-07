@@ -7,7 +7,7 @@ import {FrenArtIndex} from "./FrenArtIndex.sol";
 
 /// @title FrenRenderer - draws an IMD6900 fren on chain
 /// @notice The art lives in seven data contracts, FrenArtChunk1..7 (FrenArtIndex says what is where), each checked by
-///         its code hash when this is deployed:
+///         its code hash on every art read (the constructor only stores addresses):
 ///  - a 256-colour palette;
 ///  - each character's 13 faces (each distinct face kept once; a table points each character's faces at them);
 ///  - 3 lab coats, one fitted to each character;
@@ -112,7 +112,9 @@ contract FrenRenderer {
                 bytes(
                     string.concat(
                         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 84" width="840" height="840">',
-                        '<image width="84" height="', h, '" style="image-rendering:pixelated" href="data:image/bmp;base64,',
+                        '<image width="84" height="',
+                        h,
+                        '" style="image-rendering:pixelated" href="data:image/bmp;base64,',
                         Base64.encode(bitmap),
                         '"><animate attributeName="y" values="0;-84;-168;-252;-84" keyTimes="0;0.22;0.37;0.64;0.83" ',
                         'dur="1.3s" calcMode="discrete" repeatCount="indefinite"/></image></svg>'
@@ -127,7 +129,10 @@ contract FrenRenderer {
             '[{"trait_type":"Character","value":"',
             _name(combo & 3, "Cyborg Pepe|Mumu|Bobo"),
             '"},{"trait_type":"Face","value":"',
-            _name((combo >> 2) & 15, "Classic|Happy|Angry|Feels Bad|Grinding|Chill|Grumpy|Giga Happy|Cooked|Comfy|Special|Scientist|Laser Eyes"),
+            _name(
+                (combo >> 2) & 15,
+                "Classic|Happy|Angry|Feels Bad|Grinding|Chill|Grumpy|Giga Happy|Cooked|Comfy|Special|Scientist|Laser Eyes"
+            ),
             '"},{"trait_type":"Eye","value":"',
             _name((combo >> 6) & 3, "Green|Red|Cyan|Gold"),
             '"},{"trait_type":"Coat","value":"',
@@ -161,7 +166,9 @@ contract FrenRenderer {
             if (j == b.length || b[j] == "|") {
                 if (k == i) {
                     bytes memory out = new bytes(j - start);
-                    for (uint256 m; m < out.length; ++m) out[m] = b[start + m];
+                    for (uint256 m; m < out.length; ++m) {
+                        out[m] = b[start + m];
+                    }
                     return string(out);
                 }
                 ++k;
@@ -215,12 +222,16 @@ contract FrenRenderer {
         if (grey) {
             for (uint256 i; i < 256; ++i) {
                 uint256 b = 54 + i * 4; // B G R 0
-                uint256 l = (uint256(uint8(out[b + 2])) * 77 + uint256(uint8(out[b + 1])) * 150 + uint256(uint8(out[b])) * 29) >> 8;
+                uint256 l =
+                    (uint256(uint8(out[b + 2])) * 77 + uint256(uint8(out[b + 1])) * 150 + uint256(uint8(out[b])) * 29)
+                        >> 8;
                 bytes1 v = bytes1(uint8(l * 3 / 5));
                 (out[b], out[b + 1], out[b + 2]) = (v, v, v);
             }
         }
-        for (uint256 y; y < rows; ++y) _copy(out, 54 + 1024 + y * N, cv, (rows - 1 - y) * N, N);
+        for (uint256 y; y < rows; ++y) {
+            _copy(out, 54 + 1024 + y * N, cv, (rows - 1 - y) * N, N);
+        }
     }
 
     /// @notice The fren's pixels, palette indices, top row first.
@@ -236,7 +247,9 @@ contract FrenRenderer {
         uint256 shirt = (combo >> 10) & 7;
         uint256 eye = (combo >> 6) & 3;
         if (coat > 2 || shirt > 5) revert Missing();
-        for (uint256 i; i < 5; ++i) slot[i] = uint8(t[8 + coat * 5 + i]);
+        for (uint256 i; i < 5; ++i) {
+            slot[i] = uint8(t[8 + coat * 5 + i]);
+        }
         slot[5] = uint8(t[23 + shirt]);
         slot[6] = uint8(t[eye * 2]);
         slot[7] = uint8(t[eye * 2 + 1]);
@@ -255,7 +268,9 @@ contract FrenRenderer {
         uint256 coat = (combo >> 8) & 3;
         uint256 shirt = (combo >> 10) & 7;
         uint256 eye = (combo >> 6) & 3;
-        for (uint256 i; i < 5; ++i) slot[i] = uint8(t[8 + coat * 5 + i]);
+        for (uint256 i; i < 5; ++i) {
+            slot[i] = uint8(t[8 + coat * 5 + i]);
+        }
         slot[5] = uint8(t[23 + shirt]);
         slot[6] = uint8(t[eye * 2]);
         slot[7] = uint8(t[eye * 2 + 1]);
@@ -270,7 +285,10 @@ contract FrenRenderer {
     }
 
     /// @dev `mono`: when not 0, every pixel the layer covers takes that one colour (a silhouette)
-    function _draw(bytes memory cv, bytes memory d, int256 dx, int256 dy, uint8[8] memory slot, uint8 mono) internal pure {
+    function _draw(bytes memory cv, bytes memory d, int256 dx, int256 dy, uint8[8] memory slot, uint8 mono)
+        internal
+        pure
+    {
         uint256 x0 = uint8(d[0]);
         uint256 y0 = uint8(d[1]);
         uint256 w = uint8(d[2]);
@@ -291,7 +309,9 @@ contract FrenRenderer {
                     if (a < 0) a = 0;
                     if (b > int256(N)) b = int256(N);
                     uint256 base = uint256(yy) * N;
-                    for (int256 xx = a; xx < b; ++xx) cv[base + uint256(xx)] = bytes1(uint8(c));
+                    for (int256 xx = a; xx < b; ++xx) {
+                        cv[base + uint256(xx)] = bytes1(uint8(c));
+                    }
                 }
                 x += n;
             }
@@ -306,7 +326,9 @@ contract FrenRenderer {
     }
 
     function _le(bytes memory b, uint256 at, uint256 v, uint256 n) internal pure {
-        for (uint256 i; i < n; ++i) b[at + i] = bytes1(uint8(v >> (8 * i)));
+        for (uint256 i; i < n; ++i) {
+            b[at + i] = bytes1(uint8(v >> (8 * i)));
+        }
     }
 
     /* ── reading the art back (see FrenArtIndex) ── */

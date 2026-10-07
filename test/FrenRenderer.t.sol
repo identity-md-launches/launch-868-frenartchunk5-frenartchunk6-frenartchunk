@@ -4,9 +4,16 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {FrenRenderer} from "../src/FrenRenderer.sol";
 import {
-    FrenArtChunk1, FrenArtChunk2, FrenArtChunk3, FrenArtChunk4, FrenArtChunk5, FrenArtChunk6, FrenArtChunk7
+    FrenArtChunk1,
+    FrenArtChunk2,
+    FrenArtChunk3,
+    FrenArtChunk4,
+    FrenArtChunk5,
+    FrenArtChunk6,
+    FrenArtChunk7
 } from "../src/FrenArtChunks.sol";
 import {FrenArtRef, FrenRendererRef} from "./ref/FrenRendererRef.sol";
+import {LaunchGasFactory} from "./LaunchGasFactory.sol";
 
 /// @dev What IMD's launch factory does with `evm_contracts`, three times: each launch's contracts in order, in one
 ///      transaction, constructors only. The third names the first two launches' chunks by address.
@@ -21,7 +28,10 @@ contract ImdStyleArtLaunches {
         c4 = address(new FrenArtChunk4());
     }
 
-    function launch3(address c1, address c2, address c3, address c4) external returns (address c5, address c6, address c7, address r) {
+    function launch3(address c1, address c2, address c3, address c4)
+        external
+        returns (address c5, address c6, address c7, address r)
+    {
         c5 = address(new FrenArtChunk5());
         c6 = address(new FrenArtChunk6());
         c7 = address(new FrenArtChunk7());
@@ -33,31 +43,18 @@ contract ImdStyleArtLaunches {
 ///         and returns exactly the metadata of the renderer the frens launch with; it takes only this art.
 contract FrenRendererTest is Test {
     string constant ART = "script/art/data/";
-    uint256 constant TX_CAP = 1 << 24; // EIP-7825
 
     FrenRenderer r;
     FrenRendererRef ref;
     address[7] chunks;
-    uint256[3] launchGas;
-    uint256[3] launchInitBytes;
 
     function setUp() public {
         ImdStyleArtLaunches f = new ImdStyleArtLaunches();
-        uint256 g = gasleft();
         (chunks[0], chunks[1]) = f.launch1();
-        launchGas[0] = g - gasleft();
-        g = gasleft();
         (chunks[2], chunks[3]) = f.launch2();
-        launchGas[1] = g - gasleft();
-        g = gasleft();
         address rr;
         (chunks[4], chunks[5], chunks[6], rr) = f.launch3(chunks[0], chunks[1], chunks[2], chunks[3]);
-        launchGas[2] = g - gasleft();
         r = FrenRenderer(rr);
-        launchInitBytes[0] = type(FrenArtChunk1).creationCode.length + type(FrenArtChunk2).creationCode.length;
-        launchInitBytes[1] = type(FrenArtChunk3).creationCode.length + type(FrenArtChunk4).creationCode.length;
-        launchInitBytes[2] = type(FrenArtChunk5).creationCode.length + type(FrenArtChunk6).creationCode.length
-            + type(FrenArtChunk7).creationCode.length + type(FrenRenderer).creationCode.length + 7 * 32;
         ref = _reference();
     }
 
@@ -75,8 +72,11 @@ contract FrenRendererTest is Test {
         bytes[] memory pal = new bytes[](1);
         pal[0] = vm.readFileBinary(string.concat(ART, "palette.bin"));
         return new FrenRendererRef(
-            art.write(pal)[0], ptrs, vm.readFileBinary(string.concat(ART, "tables.bin")),
-            vm.readFileBinary(string.concat(ART, "facetable.bin")), uint8(vm.parseJsonUint(manifest, ".shadow"))
+            art.write(pal)[0],
+            ptrs,
+            vm.readFileBinary(string.concat(ART, "tables.bin")),
+            vm.readFileBinary(string.concat(ART, "facetable.bin")),
+            uint8(vm.parseJsonUint(manifest, ".shadow"))
         );
     }
 
@@ -85,7 +85,9 @@ contract FrenRendererTest is Test {
         uint256[8] memory n = [uint256(3), 13, 4, 3, 6, 3, 10, 16];
         uint256[8] memory shift = [uint256(0), 2, 6, 8, 10, 13, 15, 19];
         uint256 c;
-        for (uint256 t; t < 8; ++t) c |= ((uint256(keccak256(abi.encode(x, t))) % n[t]) << shift[t]);
+        for (uint256 t; t < 8; ++t) {
+            c |= ((uint256(keccak256(abi.encode(x, t))) % n[t]) << shift[t]);
+        }
         return uint24(c);
     }
 
@@ -109,7 +111,11 @@ contract FrenRendererTest is Test {
         for (uint256 i; i < 24; ++i) {
             uint24 combo = _combo(i);
             uint256 seed = uint256(keccak256(abi.encode("seed", i)));
-            assertEq(keccak256(bytes(r.tokenURI(i + 1, combo, seed))), keccak256(bytes(ref.tokenURI(i + 1, combo, seed))), "tokenURI");
+            assertEq(
+                keccak256(bytes(r.tokenURI(i + 1, combo, seed))),
+                keccak256(bytes(ref.tokenURI(i + 1, combo, seed))),
+                "tokenURI"
+            );
         }
         for (uint256 bg; bg < 10; ++bg) {
             uint24 combo = uint24(_combo(100 + bg) & ~uint256(15 << 15) | bg << 15);
@@ -122,7 +128,8 @@ contract FrenRendererTest is Test {
     }
 
     function test_RejectsCombosOutsideTheArt() public {
-        uint24[6] memory bad = [uint24(3), uint24(13 << 2), uint24(3 << 8), uint24(6 << 10), uint24(3 << 13), uint24(10 << 15)];
+        uint24[6] memory bad =
+            [uint24(3), uint24(13 << 2), uint24(3 << 8), uint24(6 << 10), uint24(3 << 13), uint24(10 << 15)];
         for (uint256 i; i < bad.length; ++i) {
             vm.expectRevert(); // Missing, or an out-of-range read of the index
             r.canvas(bad[i], 0);
@@ -139,23 +146,36 @@ contract FrenRendererTest is Test {
         assertEq(bytes(uri)[0], "d");
     }
 
+    /// @dev Explicit eth_call budgets for the audit's examples. Providers must also allow the consumer's overhead.
+    function test_MetadataFitsThirtyMillionGas() public {
+        bytes memory input = abi.encodeCall(FrenRenderer.tokenURI, (1, uint24(0xbd59c), 42));
+        uint256 g = gasleft();
+        (bool ok, bytes memory result) = address(r).staticcall{gas: 30_000_000}(input);
+        emit log_named_uint("tokenURI sample gas", g - gasleft());
+        assertTrue(ok, "tokenURI exceeds the sample RPC budget");
+        assertEq(abi.decode(result, (string)), ref.tokenURI(1, 0xbd59c, 42));
+
+        input = abi.encodeCall(FrenRenderer.pendingURI, (1));
+        g = gasleft();
+        (ok, result) = address(r).staticcall{gas: 30_000_000}(input);
+        emit log_named_uint("pendingURI sample gas", g - gasleft());
+        assertTrue(ok, "pendingURI exceeds the sample RPC budget");
+        assertEq(abi.decode(result, (string)), ref.pendingURI(1));
+    }
+
     /* ── the launches ────────────────────────────────────────────── */
 
-    /// @dev Each launch, with a transaction's base cost and its initcode as calldata, under the per-transaction cap
-    function test_LaunchesFitTransactions() public {
-        for (uint256 i; i < 3; ++i) {
-            uint256 total = launchGas[i] + 21_000 + 16 * launchInitBytes[i];
-            emit log_named_uint(string.concat("launch ", vm.toString(i + 1), " gas (with calldata)"), total);
-            assertLt(total, TX_CAP * 95 / 100);
-        }
-    }
+    // Deployment gas is checked from a local Anvil receipt by script/check_launch_gas.py.
+    // Forge's gasleft() deltas around CREATE omit code-deposit costs in the audited toolchain.
 
     /// @dev The renderer draws only these chunks, in this order: anything else and every read reverts
     function test_DrawsOnlyThisArt() public {
-        FrenRenderer swapped = new FrenRenderer(chunks[1], chunks[0], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6]);
+        FrenRenderer swapped =
+            new FrenRenderer(chunks[1], chunks[0], chunks[2], chunks[3], chunks[4], chunks[5], chunks[6]);
         vm.expectRevert(FrenRenderer.BadArt.selector);
         swapped.tokenURI(1, 0, 0);
-        FrenRenderer stranger = new FrenRenderer(chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], address(0xBEEF));
+        FrenRenderer stranger =
+            new FrenRenderer(chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5], address(0xBEEF));
         vm.expectRevert(FrenRenderer.BadArt.selector);
         stranger.pendingURI(1);
         assertEq(r.chunk7(), chunks[6]);
@@ -164,28 +184,80 @@ contract FrenRendererTest is Test {
     /// @dev IMD's admission deploys launch 3 on a fresh chain, where launches 1 and 2's chunks don't exist: the
     ///      renderer must still deploy there (it reads nothing until asked to draw)
     function test_DeploysWithoutTheEarlierChunks() public {
-        address c5 = address(new FrenArtChunk5());
-        address c6 = address(new FrenArtChunk6());
-        address c7 = address(new FrenArtChunk7());
-        FrenRenderer alone = new FrenRenderer(
-            0xa92dAcfF6d6fcC218ADe20eD24857376BD8eBE81, 0x9666A481e20F1dB59EEbD6c43D11Ae3505468c92,
-            0x71BdEB749b3ee428730eBB3E9b34B03A99D82356, 0x0C344484D960B8474a1EdcB5A5128e8D9C9F6B4d, c5, c6, c7
+        LaunchGasFactory factory = new LaunchGasFactory();
+        bytes[] memory codes = new bytes[](4);
+        codes[0] = type(FrenArtChunk5).creationCode;
+        codes[1] = type(FrenArtChunk6).creationCode;
+        codes[2] = type(FrenArtChunk7).creationCode;
+        address c5 = _predicted(address(factory), 0, codes[0]);
+        address c6 = _predicted(address(factory), 1, codes[1]);
+        address c7 = _predicted(address(factory), 2, codes[2]);
+        codes[3] = abi.encodePacked(
+            type(FrenRenderer).creationCode,
+            abi.encode(
+                0xa92dAcfF6d6fcC218ADe20eD24857376BD8eBE81,
+                0x9666A481e20F1dB59EEbD6c43D11Ae3505468c92,
+                0x71BdEB749b3ee428730eBB3E9b34B03A99D82356,
+                0x0C344484D960B8474a1EdcB5A5128e8D9C9F6B4d,
+                c5,
+                c6,
+                c7
+            )
         );
+        address[] memory deployed = factory.deploy(codes);
+        for (uint256 i; i < deployed.length; ++i) {
+            assertEq(deployed[i], _predicted(address(factory), i, codes[i]));
+            _assertAdmitted(deployed[i]);
+        }
+        FrenRenderer alone = FrenRenderer(deployed[3]);
+        assertEq(alone.chunk1(), 0xa92dAcfF6d6fcC218ADe20eD24857376BD8eBE81);
+        assertEq(alone.chunk2(), 0x9666A481e20F1dB59EEbD6c43D11Ae3505468c92);
+        assertEq(alone.chunk3(), 0x71BdEB749b3ee428730eBB3E9b34B03A99D82356);
+        assertEq(alone.chunk4(), 0x0C344484D960B8474a1EdcB5A5128e8D9C9F6B4d);
         assertEq(alone.chunk5(), c5);
+        assertEq(alone.chunk6(), c6);
+        assertEq(alone.chunk7(), c7);
+        assertEq(alone.chunk1().code.length, 0);
+        assertEq(alone.chunk2().code.length, 0);
+        assertEq(alone.chunk3().code.length, 0);
+        assertEq(alone.chunk4().code.length, 0);
+        vm.expectRevert(FrenRenderer.BadArt.selector);
+        alone.tokenURI(1, 0, 0);
+        vm.expectRevert(FrenRenderer.BadArt.selector);
+        alone.pendingURI(1);
+    }
+
+    function _predicted(address factory, uint256 salt, bytes memory code) internal pure returns (address) {
+        return
+            address(
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), factory, bytes32(salt), keccak256(code)))))
+            );
     }
 
     /// @dev IMD's launch admission reads code as instructions (PUSH data skipped) and refuses CALLCODE, DELEGATECALL
     ///      and SELFDESTRUCT bytes even in code that never runs: every chunk must read clean
     function test_ChunksPassTheAdmissionScan() public view {
         for (uint256 k; k < 7; ++k) {
-            bytes memory code = chunks[k].code;
-            uint256 hits;
-            for (uint256 i; i < code.length; ++i) {
-                uint8 op = uint8(code[i]);
-                if (op == 0xf2 || op == 0xf4 || op == 0xff) ++hits;
-                if (op >= 0x60 && op <= 0x7f) i += op - 0x5f;
+            _assertAdmitted(chunks[k]);
+        }
+    }
+
+    function test_RendererPassesTheAdmissionScan() public view {
+        _assertAdmitted(address(r));
+    }
+
+    /// @dev Identical bounds and instruction walk to the protected launch admission check.
+    function _assertAdmitted(address application) internal view {
+        bytes memory code = application.code;
+        assertGt(code.length, 0, "missing runtime");
+        assertLe(code.length, 24_576, "runtime exceeds EIP-170");
+        for (uint256 i; i < code.length; ++i) {
+            uint8 op = uint8(code[i]);
+            if (op >= 0x60 && op <= 0x7f) {
+                i += op - 0x5f;
+                continue;
             }
-            assertEq(hits, 0, string.concat("chunk ", vm.toString(k + 1)));
+            assertTrue(op != 0xf4 && op != 0xf2 && op != 0xff, "forbidden application opcode");
         }
     }
 }
