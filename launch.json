@@ -1,0 +1,30 @@
+{
+  "kind": "evm_contracts",
+  "contracts": [
+    {
+      "contract": "FrenArtChunk5",
+      "constructorArgs": []
+    },
+    {
+      "contract": "FrenArtChunk6",
+      "constructorArgs": []
+    },
+    {
+      "contract": "FrenArtChunk7",
+      "constructorArgs": []
+    },
+    {
+      "contract": "FrenRenderer",
+      "constructorArgs": [
+        "0xa92dAcfF6d6fcC218ADe20eD24857376BD8eBE81",
+        "0x9666A481e20F1dB59EEbD6c43D11Ae3505468c92",
+        "0x71BdEB749b3ee428730eBB3E9b34B03A99D82356",
+        "0x0C344484D960B8474a1EdcB5A5128e8D9C9F6B4d",
+        "$contract:FrenArtChunk5",
+        "$contract:FrenArtChunk6",
+        "$contract:FrenArtChunk7"
+      ]
+    }
+  ],
+  "notes": "Part 3 of 3 of the IMD6900 Frens on-chain art: deploy FrenArtChunk5, FrenArtChunk6 and FrenArtChunk7 from src/FrenArtChunks.sol without constructor arguments, then FrenRenderer from src/FrenRenderer.sol. Use the accepted art and FrenArtIndex unchanged, including FrenArtChunk7's PUSH32 framing. Renderer arguments are chunks 1 and 2 from IMD launch #819, chunks 3 and 4 from #838, then the three chunks deployed here, in that order. The renderer constructor only stores the seven addresses and can deploy without the earlier chunks present. Art reads check the relevant chunk's code hash and revert BadArt on a mismatch. These contracts have no owner or post-deployment configuration."
+}
