@@ -131,7 +131,7 @@ contract FrenRendererTest is Test {
         uint24[6] memory bad =
             [uint24(3), uint24(13 << 2), uint24(3 << 8), uint24(6 << 10), uint24(3 << 13), uint24(10 << 15)];
         for (uint256 i; i < bad.length; ++i) {
-            vm.expectRevert(); // Missing, or an out-of-range read of the index
+            vm.expectRevert(FrenRenderer.Missing.selector);
             r.canvas(bad[i], 0);
         }
         r.canvas(uint24(2 | 12 << 2 | 3 << 6 | 2 << 8 | 5 << 10 | 2 << 13 | 9 << 15 | 15 << 19), 1); // every trait at its last value
@@ -144,6 +144,41 @@ contract FrenRendererTest is Test {
         emit log_named_uint("tokenURI gas", g - gasleft());
         assertLt(g - gasleft(), 30_000_000);
         assertEq(bytes(uri)[0], "d");
+    }
+
+    /// forge-config: default.fuzz.runs = 64
+    function testFuzz_ValidArtMatchesReference(uint256 traits, uint256 seed) public view {
+        uint24 combo = _combo(traits);
+        assertEq(r.bmp(combo, seed), ref.bmp(combo, seed), "fuzzed bitmap");
+        assertEq(r.attributes(combo), ref.attributes(combo), "fuzzed traits");
+    }
+
+    /// @dev Isolate one invalid field while keeping every other trait valid. Require the application error,
+    ///      not an arithmetic panic, across all three revealed-art entry points.
+    /// forge-config: default.fuzz.runs = 128
+    function testFuzz_InvalidTraitsRevertMissing(uint256 traits, uint256 field, uint256 value, uint256 seed) public {
+        uint256[6] memory shifts = [uint256(0), 2, 8, 10, 13, 15];
+        uint256[6] memory masks = [uint256(3), 15, 3, 7, 3, 15];
+        uint256[6] memory firstInvalid = [uint256(3), 13, 3, 6, 3, 10];
+        field = bound(field, 0, 5);
+        value = bound(value, firstInvalid[field], masks[field]);
+        uint24 combo = uint24((uint256(_combo(traits)) & ~(masks[field] << shifts[field])) | value << shifts[field]);
+        vm.expectRevert(FrenRenderer.Missing.selector);
+        r.canvas(combo, seed);
+        vm.expectRevert(FrenRenderer.Missing.selector);
+        r.bmp(combo, seed);
+        vm.expectRevert(FrenRenderer.Missing.selector);
+        r.tokenURI(1, combo, seed);
+    }
+
+    function test_ReferenceAtTraitSeedAndTokenIdEdges() public view {
+        uint24 last = uint24(2 | 12 << 2 | 3 << 6 | 2 << 8 | 5 << 10 | 2 << 13 | 9 << 15 | 15 << 19);
+        uint256[4] memory edges = [uint256(0), 1, 2222, type(uint256).max];
+        for (uint256 i; i < edges.length; ++i) {
+            uint24 combo = i % 2 == 0 ? 0 : last;
+            assertEq(r.tokenURI(edges[i], combo, edges[i]), ref.tokenURI(edges[i], combo, edges[i]));
+            assertEq(r.pendingURI(edges[i]), ref.pendingURI(edges[i]));
+        }
     }
 
     /// @dev Explicit eth_call budgets for the audit's examples. Providers must also allow the consumer's overhead.
@@ -225,6 +260,13 @@ contract FrenRendererTest is Test {
         alone.tokenURI(1, 0, 0);
         vm.expectRevert(FrenRenderer.BadArt.selector);
         alone.pendingURI(1);
+
+        // Install the genuine earlier runtimes at the exact launch addresses, without configuring the renderer.
+        vm.etch(alone.chunk1(), chunks[0].code);
+        vm.etch(alone.chunk2(), chunks[1].code);
+        vm.etch(alone.chunk3(), chunks[2].code);
+        vm.etch(alone.chunk4(), chunks[3].code);
+        assertEq(alone.bmp(0, 0), ref.bmp(0, 0), "art available without initialization");
     }
 
     function _predicted(address factory, uint256 salt, bytes memory code) internal pure returns (address) {
